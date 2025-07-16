@@ -70,9 +70,6 @@ class DataService:
                         temp_file.write(f_in.read())
                         temp_file.flush()
                         conn = sqlite3.connect(temp_file.name)
-                        
-                        # Store temp file path for cleanup (optional)
-                        conn._temp_file_path = temp_file.name
                         return conn
             else:
                 # Handle uncompressed file
@@ -82,6 +79,7 @@ class DataService:
             logger.error(f"Error connecting to database for {date_str}: {str(e)}")
             return None
 
+    
     def _load_instruments(self, conn: sqlite3.Connection, date_str: str) -> Dict[int, InstrumentInfo]:
         """Load and cache instruments for a given date"""
         if date_str in self._instruments_cache:
