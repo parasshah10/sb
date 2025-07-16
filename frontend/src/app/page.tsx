@@ -8,12 +8,12 @@ import { useTradingData } from '@/hooks/useTradingData';
 import { AlertCircle } from 'lucide-react';
 
 export default function Dashboard() {
-  const { chartSettings, error } = useStore();
+  const { error } = useStore();
   const { loading } = useTradingData();
 
   if (error) {
     return (
-      <div className="h-screen flex items-center justify-center">
+      <div className="h-screen flex items-center justify-center p-4">
         <div className="text-center">
           <AlertCircle className="h-12 w-12 text-error-500 mx-auto mb-4" />
           <h2 className="text-xl font-semibold text-gray-900 mb-2">
@@ -26,18 +26,14 @@ export default function Dashboard() {
   }
 
   return (
-    <div className={`h-screen flex flex-col ${chartSettings.isFullscreen ? 'fixed inset-0 z-50' : 'p-4'}`}>
-      {/* Chart Container */}
-      <div className={`flex-1 ${chartSettings.isFullscreen ? 'mb-20' : 'mb-4'}`}>
-        <div className="h-full bg-white rounded-lg shadow-sm border border-gray-200">
-          <TradingChart />
-        </div>
+    <div className="h-screen w-screen flex flex-col overflow-hidden">
+      {/* Chart Container - Always Fullscreen */}
+      <div className="flex-1 relative">
+        <TradingChart />
       </div>
 
-      {/* Control Panel */}
-      <div className={chartSettings.isFullscreen ? 'fixed bottom-4 left-4 right-4 z-60' : ''}>
-        <ControlPanel />
-      </div>
+      {/* Control Panel - Fixed at bottom */}
+      <ControlPanel />
     </div>
   );
 }

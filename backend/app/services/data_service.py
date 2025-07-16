@@ -21,26 +21,33 @@ class DataService:
     def get_available_trading_days(self) -> List[str]:
         """Get all available trading days from data folder"""
         try:
-            dates = []
-            for file_path in self.data_folder.glob(f"{settings.DB_PREFIX}*{settings.DB_EXTENSION}*"):
-                # Extract date from filename
-                filename = file_path.stem
-                if filename.endswith(settings.DB_EXTENSION):
-                    filename = filename[:-len(settings.DB_EXTENSION)]
+            dates = set()  # Use set to avoid duplicates
+            
+            # Look for both compressed and uncompressed files
+            for file_path in self.data_folder.glob(f"{settings.DB_PREFIX}*"):
+                filename = file_path.name
                 
-                date_part = filename.replace(settings.DB_PREFIX, "")
+                # Handle compressed files
+                if filename.endswith(f"{settings.DB_EXTENSION}{settings.COMPRESSED_EXTENSION}"):
+                    date_part = filename.replace(settings.DB_PREFIX, "").replace(f"{settings.DB_EXTENSION}{settings.COMPRESSED_EXTENSION}", "")
+                # Handle uncompressed files
+                elif filename.endswith(settings.DB_EXTENSION):
+                    date_part = filename.replace(settings.DB_PREFIX, "").replace(settings.DB_EXTENSION, "")
+                else:
+                    continue
+                
                 try:
                     # Validate date format
                     datetime.strptime(date_part, "%Y-%m-%d")
-                    dates.append(date_part)
+                    dates.add(date_part)  # Add to set (automatically deduplicates)
                 except ValueError:
                     continue
             
-            return sorted(dates, reverse=True)
+            return sorted(list(dates), reverse=True)  # Convert set back to sorted list
         except Exception as e:
             logger.error(f"Error getting trading days: {str(e)}")
             return []
-    
+
     def _get_db_path(self, date_str: str) -> Optional[Path]:
         """Get database path for given date (compressed or uncompressed)"""
         db_filename = f"{settings.DB_PREFIX}{date_str}{settings.DB_EXTENSION}"

@@ -4,12 +4,11 @@ import { DaySummary } from './DaySummary';
 import { useStore } from '@/store/useStore';
 import { useTradingData } from '@/hooks/useTradingData';
 import {
-  Maximize2,
-  Minimize2,
   RefreshCw,
   Eye,
   EyeOff,
   Target,
+  Circle,
 } from 'lucide-react';
 
 export function ControlPanel() {
@@ -25,10 +24,10 @@ export function ControlPanel() {
   const { tradingDays, refreshData } = useTradingData();
 
   return (
-    <div className="glass-effect rounded-lg p-4 border border-gray-200/50">
-      <div className="flex items-center justify-between gap-4 flex-wrap">
+    <div className="fixed bottom-4 left-4 right-4 z-50 glass-effect rounded-lg p-3 border border-gray-200/50">
+      <div className="flex items-center justify-between gap-2">
         {/* Left side - Date picker and summary */}
-        <div className="flex items-center gap-6">
+        <div className="flex items-center gap-3 flex-1 min-w-0">
           <DatePicker
             selectedDate={selectedDate}
             availableDates={tradingDays}
@@ -37,21 +36,23 @@ export function ControlPanel() {
           />
           
           {currentData?.summary && (
-            <DaySummary summary={currentData.summary} />
+            <div className="hidden sm:block">
+              <DaySummary summary={currentData.summary} />
+            </div>
           )}
         </div>
         
         {/* Right side - Controls */}
-        <div className="flex items-center gap-2">
+        <div className="flex items-center gap-1">
           <Button
             variant="outline"
             size="sm"
             onClick={refreshData}
             disabled={loading}
-            className="flex items-center gap-2"
+            className="h-8 px-2"
           >
-            <RefreshCw className={`h-4 w-4 ${loading ? 'animate-spin' : ''}`} />
-            Refresh
+            <RefreshCw className={`h-3 w-3 ${loading ? 'animate-spin' : ''}`} />
+            <span className="hidden sm:inline ml-1">Refresh</span>
           </Button>
           
           <Button
@@ -62,14 +63,14 @@ export function ControlPanel() {
                 showUnderlying: !chartSettings.showUnderlying,
               })
             }
-            className="flex items-center gap-2"
+            className="h-8 px-2"
           >
             {chartSettings.showUnderlying ? (
-              <Eye className="h-4 w-4" />
+              <Eye className="h-3 w-3" />
             ) : (
-              <EyeOff className="h-4 w-4" />
+              <EyeOff className="h-3 w-3" />
             )}
-            Underlying
+            <span className="hidden sm:inline ml-1">Spot</span>
           </Button>
           
           <Button
@@ -80,35 +81,24 @@ export function ControlPanel() {
                 showTradeMarkers: !chartSettings.showTradeMarkers,
               })
             }
-            className="flex items-center gap-2"
+            className="h-8 px-2"
           >
             {chartSettings.showTradeMarkers ? (
-              <Target className="h-4 w-4" />
+              <Target className="h-3 w-3" />
             ) : (
-              <EyeOff className="h-4 w-4" />
+              <Circle className="h-3 w-3" />
             )}
-            Trades
-          </Button>
-          
-          <Button
-            variant="outline"
-            size="sm"
-            onClick={() =>
-              updateChartSettings({
-                isFullscreen: !chartSettings.isFullscreen,
-              })
-            }
-            className="flex items-center gap-2"
-          >
-            {chartSettings.isFullscreen ? (
-              <Minimize2 className="h-4 w-4" />
-            ) : (
-              <Maximize2 className="h-4 w-4" />
-            )}
-            {chartSettings.isFullscreen ? 'Exit' : 'Full'}
+            <span className="hidden sm:inline ml-1">Trades</span>
           </Button>
         </div>
       </div>
+      
+      {/* Mobile summary */}
+      {currentData?.summary && (
+        <div className="sm:hidden mt-2 pt-2 border-t border-gray-200">
+          <DaySummary summary={currentData.summary} />
+        </div>
+      )}
     </div>
   );
 }

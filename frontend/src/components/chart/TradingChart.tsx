@@ -1,12 +1,11 @@
 'use client';
 
 import { useEffect, useRef, useState } from 'react';
-import { createChart, ColorType, IChartApi, ISeriesApi, UTCTimestamp, MouseEventParams, Time } from 'lightweight-charts';
+import { createChart, ColorType, IChartApi, ISeriesApi, Time } from 'lightweight-charts';
 import { useStore } from '@/store/useStore';
 import { ChartTooltip } from './ChartTooltip';
 import { SnapshotData, ChartData } from '@/types';
 import { LoadingSpinner } from '@/components/common/LoadingSpinner';
-import { throttle } from '@/lib/utils';
 
 export function TradingChart() {
   const chartContainerRef = useRef<HTMLDivElement>(null);
@@ -16,7 +15,6 @@ export function TradingChart() {
   const resizeObserverRef = useRef<ResizeObserver | null>(null);
   
   const [selectedSnapshot, setSelectedSnapshot] = useState<SnapshotData | null>(null);
-  const [tooltipPosition, setTooltipPosition] = useState<{ x: number; y: number } | null>(null);
   
   const {
     currentData,
@@ -114,39 +112,20 @@ export function TradingChart() {
     pnlSeriesRef.current = pnlSeries;
     underlyingSeriesRef.current = underlyingSeries;
 
-    // Handle crosshair move
-    const throttledCrosshairMove = throttle((param: MouseEventParams<Time>) => {
-      if (!param.point || !param.time || !currentData) return;
-
-      const snapshot = currentData.timeseries.find(
-        (s: SnapshotData) => new Date(s.timestamp).getTime() / 1000 === param.time
-      );
-
-      if (snapshot) {
-        setSelectedSnapshot(snapshot);
-        setTooltipPosition({
-          x: param.point.x + chartContainerRef.current!.offsetLeft,
-          y: param.point.y + chartContainerRef.current!.offsetTop,
-        });
+    // Handle CLICK ONLY - no hover nonsense
+    chart.subscribeClick((param) => {
+      if (!param.point || !param.time || !currentData) {
+        // Click outside, close tooltip
+        setSelectedSnapshot(null);
+        return;
       }
-    }, 16);
-
-    chart.subscribeCrosshairMove(throttledCrosshairMove);
-
-    // Handle click
-    chart.subscribeClick((param: MouseEventParams<Time>) => {
-      if (!param.point || !param.time || !currentData) return;
 
       const snapshot = currentData.timeseries.find(
-        (s: SnapshotData) => new Date(s.timestamp).getTime() / 1000 === param.time
+        (s) => new Date(s.timestamp).getTime() / 1000 === param.time
       );
 
       if (snapshot) {
         setSelectedSnapshot(snapshot);
-        setTooltipPosition({
-          x: param.point.x + chartContainerRef.current!.offsetLeft,
-          y: param.point.y + chartContainerRef.current!.offsetTop,
-        });
       }
     });
 
@@ -169,50 +148,66 @@ export function TradingChart() {
     };
   }, [currentData, chartSettings.showUnderlying]);
 
-  // Update chart data
   useEffect(() => {
     if (!currentData || !pnlSeriesRef.current || !underlyingSeriesRef.current) return;
-
+  
     const chartData: ChartData[] = currentData.timeseries.map((snapshot) => ({
-      time: (new Date(snapshot.timestamp).getTime() / 1000) as UTCTimestamp,
+      time: new Date(snapshot.timestamp).getTime() / 1000,
       value: snapshot.total_pnl,
       underlying: snapshot.underlying_price,
       snapshot,
     }));
-
-    // Set P&L data
-    pnlSeriesRef.current.setData(
-      chartData.map((d) => ({ time: d.time as UTCTimestamp, value: d.value }))
-    );
-
-    // Set underlying data
+  
+    // Set P&L data - filter out invalid values
+    const pnlData = chartData
+      .filter((d) => typeof d.value === 'number' && !isNaN(d.value))
+      .map((d) => ({ 
+        time: d.time as Time, 
+        value: d.value 
+      }));
+  
+    pnlSeriesRef.current.setData(pnlData);
+  
+    // Set underlying data - filter out null/undefined/invalid values
     if (chartSettings.showUnderlying) {
-      underlyingSeriesRef.current.setData(
-        chartData
-          .filter((d) => d.underlying != null)
-          .map((d) => ({ time: d.time as UTCTimestamp, value: d.underlying! }))
-      );
+      const underlyingData = chartData
+        .filter((d) => 
+          d.underlying !== null && 
+          d.underlying !== undefined && 
+          typeof d.underlying === 'number' && 
+          !isNaN(d.underlying)
+        )
+        .map((d) => ({ 
+          time: d.time as Time, 
+          value: d.underlying! 
+        }));
+  
+      underlyingSeriesRef.current.setData(underlyingData);
     }
-
+  
     // Add trade markers
     if (chartSettings.showTradeMarkers) {
       const markers = chartData
-        .filter((d) => d.snapshot?.trade_marker && d.snapshot.trade_marker.type !== 'none')
+        .filter((d) => 
+          d.snapshot && 
+          d.snapshot.trade_marker && 
+          d.snapshot.trade_marker.type !== 'none'
+        )
         .map((d) => ({
-          time: d.time as UTCTimestamp,
+          time: d.time as Time,
           position: 'belowBar' as const,
           color: d.snapshot!.trade_marker!.type === 'square_up' ? '#dc2626' : '#3b82f6',
           shape: 'circle' as const,
           text: d.snapshot!.trade_marker!.type === 'square_up' ? 'S' : 'T',
         }));
-
+  
       pnlSeriesRef.current.setMarkers(markers);
     }
-
+  
     // Fit content
     chartRef.current?.timeScale().fitContent();
   }, [currentData, chartSettings.showTradeMarkers, chartSettings.showUnderlying]);
-
+  
   // Update underlying visibility
   useEffect(() => {
     if (underlyingSeriesRef.current && chartRef.current) {
@@ -244,7 +239,6 @@ export function TradingChart() {
 
   const handleCloseTooltip = () => {
     setSelectedSnapshot(null);
-    setTooltipPosition(null);
   };
 
   if (loading) {
@@ -263,10 +257,9 @@ export function TradingChart() {
         style={{ minHeight: '400px' }}
       />
       
-      {selectedSnapshot && tooltipPosition && (
+      {selectedSnapshot && (
         <ChartTooltip
           snapshot={selectedSnapshot}
-          position={tooltipPosition}
           viewMode={viewMode}
           onClose={handleCloseTooltip}
           onViewModeChange={setViewMode}

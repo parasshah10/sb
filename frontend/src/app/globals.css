@@ -1,3 +1,4 @@
+/* frontend/src/app/globals.css */
 @import url('https://fonts.googleapis.com/css2?family=Inter:wght@300;400;500;600;700&display=swap');
 @import url('https://fonts.googleapis.com/css2?family=JetBrains+Mono:wght@400;500;600&display=swap');
 @tailwind base;
@@ -5,11 +6,12 @@
 @tailwind utilities;
 
 @layer base {
-  * {
-    @apply border-border;
-  }
   body {
-    @apply bg-background text-foreground;
+    /*
+     * The background color is handled in layout.tsx.
+     * We'll set a default text color here.
+    */
+    @apply text-gray-900;
     font-feature-settings: "rlig" 1, "calt" 1;
   }
 }
@@ -40,7 +42,7 @@
   }
   
   .trade-marker-pulse {
-    @apply animate-pulse-dot;
+    @apply animate-pulse; /* Use built-in Tailwind animation */
   }
 }
 
