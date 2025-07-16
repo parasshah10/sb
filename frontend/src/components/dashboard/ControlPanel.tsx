@@ -24,8 +24,8 @@ export function ControlPanel() {
   const { tradingDays, refreshData } = useTradingData();
 
   return (
-    <div className="fixed bottom-4 left-4 right-4 z-50 glass-effect rounded-lg p-3 border border-gray-200/50">
-      <div className="flex items-center justify-between gap-2">
+    <div className="glass-effect rounded-lg p-3 border border-gray-200/50 max-w-full">
+      <div className="flex items-center justify-between gap-2 flex-wrap">
         {/* Left side - Date picker and summary */}
         <div className="flex items-center gap-3 flex-1 min-w-0">
           <DatePicker
@@ -43,7 +43,7 @@ export function ControlPanel() {
         </div>
         
         {/* Right side - Controls */}
-        <div className="flex items-center gap-1">
+        <div className="flex items-center gap-1 flex-shrink-0">
           <Button
             variant="outline"
             size="sm"

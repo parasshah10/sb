@@ -1,4 +1,3 @@
-/* frontend/src/app/globals.css */
 @import url('https://fonts.googleapis.com/css2?family=Inter:wght@300;400;500;600;700&display=swap');
 @import url('https://fonts.googleapis.com/css2?family=JetBrains+Mono:wght@400;500;600&display=swap');
 @tailwind base;
@@ -6,12 +5,11 @@
 @tailwind utilities;
 
 @layer base {
+  * {
+    @apply border-border;
+  }
   body {
-    /*
-     * The background color is handled in layout.tsx.
-     * We'll set a default text color here.
-    */
-    @apply text-gray-900;
+    @apply bg-background text-foreground;
     font-feature-settings: "rlig" 1, "calt" 1;
   }
 }
@@ -25,8 +23,12 @@
     @apply backdrop-blur-sm bg-gray-900/80 border border-gray-800/20;
   }
   
-  .chart-tooltip {
-    @apply glass-effect rounded-lg shadow-lg border border-gray-200/50;
+  .chart-tooltip-glass {
+    backdrop-filter: blur(3px) !important;
+    -webkit-backdrop-filter: blur(3px) !important;
+    background: rgba(255, 255, 255, 0.9) !important;
+    border: 1px solid rgba(255, 255, 255, 0.2) !important;
+    box-shadow: 0 4px 20px rgba(0, 0, 0, 0.1) !important;
   }
   
   .trade-marker {
@@ -42,7 +44,7 @@
   }
   
   .trade-marker-pulse {
-    @apply animate-pulse; /* Use built-in Tailwind animation */
+    @apply animate-pulse-dot;
   }
 }
 

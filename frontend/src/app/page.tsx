@@ -26,14 +26,16 @@ export default function Dashboard() {
   }
 
   return (
-    <div className="h-screen w-screen flex flex-col overflow-hidden">
-      {/* Chart Container - Always Fullscreen */}
-      <div className="flex-1 relative">
+    <div className="h-screen overflow-hidden flex flex-col">
+      {/* Chart Container - Takes remaining space */}
+      <div className="flex-1 min-h-0 relative bg-white">
         <TradingChart />
       </div>
 
-      {/* Control Panel - Fixed at bottom */}
-      <ControlPanel />
+      {/* Control Panel - Fixed height at bottom */}
+      <div className="flex-shrink-0 p-2 sm:p-4 bg-gray-50">
+        <ControlPanel />
+      </div>
     </div>
   );
 }
