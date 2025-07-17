@@ -642,14 +642,20 @@ function DeltaView({
   const hasTradeMarker = snapshot.trade_marker && snapshot.trade_marker.type !== 'none';
 
   // Helper function to get change type color and icon
-  const getChangeTypeDisplay = (changeType: string) => {
+  const getChangeTypeDisplay = (changeType: string, oldQty: number = 0, newQty: number = 0) => {
     switch (changeType) {
       case 'new':
         return { color: 'text-green-600', icon: '+', label: 'NEW' };
       case 'closed':
         return { color: 'text-red-600', icon: '×', label: 'CLOSED' };
       case 'quantity_change':
-        return { color: 'text-blue-600', icon: '↕', label: 'QTY' };
+        // Determine if it's a buy or sell based on quantity change
+        const isBuy = newQty > oldQty;
+        return { 
+          color: isBuy ? 'text-green-600' : 'text-red-600', 
+          icon: isBuy ? '+' : '-', 
+          label: isBuy ? 'BUY' : 'SELL' 
+        };
       case 'price_change':
         return { color: 'text-orange-600', icon: '₹', label: 'PRICE' };
       default:
@@ -657,10 +663,17 @@ function DeltaView({
     }
   };
 
-  // Helper function to get quantity change color
-  const getQuantityChangeColor = (oldQty: number, newQty: number) => {
-    if (newQty > oldQty) return 'text-green-600';
-    if (newQty < oldQty) return 'text-red-600';
+  // Helper function to get position-based color (green for long, red for short)
+  const getPositionColor = (quantity: number) => {
+    if (quantity > 0) return 'text-green-600';
+    if (quantity < 0) return 'text-red-600';
+    return 'text-gray-600';
+  };
+
+  // Helper function to get net change color
+  const getNetChangeColor = (change: number) => {
+    if (change > 0) return 'text-green-600';
+    if (change < 0) return 'text-red-600';
     return 'text-gray-600';
   };
 
@@ -709,8 +722,11 @@ function DeltaView({
               <tbody>
                 {snapshot.trade_marker.changes.map((change, index) => {
                   const instrument = change.instrument;
-                  const changeDisplay = getChangeTypeDisplay(change.change_type);
-                  const qtyChangeColor = getQuantityChangeColor(change.old_quantity || 0, change.new_quantity || 0);
+                  const changeDisplay = getChangeTypeDisplay(change.change_type, change.old_quantity || 0, change.new_quantity || 0);
+                  const oldQtyColor = getPositionColor(change.old_quantity || 0);
+                  const newQtyColor = getPositionColor(change.new_quantity || 0);
+                  const netChange = (change.new_quantity || 0) - (change.old_quantity || 0);
+                  const netChangeColor = getNetChangeColor(netChange);
                   
                   return (
                     <tr key={index} className="border-b border-gray-100">
@@ -741,7 +757,7 @@ function DeltaView({
                         <span className={`font-bold ${changeDisplay.color}`} style={{ fontSize: '12px' }}>
                           {changeDisplay.icon}
                         </span>
-                        <div className={`${changeDisplay.color} truncate`} style={{ fontSize: '8px' }}>
+                        <div className={`${changeDisplay.color} truncate`} style={{ fontSize: '9px' }}>
                           {changeDisplay.label}
                         </div>
                       </td>
@@ -749,31 +765,45 @@ function DeltaView({
                       {/* Change column */}
                       <td className="text-center font-mono" style={{ width: '60px', padding: '2px 1px' }}>
                         {change.change_type === 'quantity_change' && (
-                          <div className={`font-medium ${qtyChangeColor}`} style={{ fontSize: '12px' }}>
-                            <div>{change.old_quantity}</div>
-                            <div style={{ fontSize: '10px' }}>↓</div>
-                            <div>{change.new_quantity}</div>
+                          <div className="font-medium" style={{ fontSize: '11px' }}>
+                            <div className={oldQtyColor}>{change.old_quantity}</div>
+                            <div style={{ fontSize: '8px' }}>↓</div>
+                            <div className={newQtyColor}>{change.new_quantity}</div>
+                            <div className={netChangeColor} style={{ fontSize: '9px', opacity: 0.8 }}>
+                              ({netChange > 0 ? '+' : ''}{netChange})
+                            </div>
                           </div>
                         )}
                         {change.change_type === 'new' && (
-                          <div className="text-green-600 font-medium" style={{ fontSize: '12px' }}>
-                            <div>0</div>
-                            <div style={{ fontSize: '10px' }}>↓</div>
-                            <div>+{change.new_quantity}</div>
+                          <div className="font-medium" style={{ fontSize: '11px' }}>
+                            <div className="text-gray-600">0</div>
+                            <div style={{ fontSize: '8px' }}>↓</div>
+                            <div className={getPositionColor(change.new_quantity || 0)}>
+                              {change.new_quantity! > 0 ? '+' : ''}{change.new_quantity}
+                            </div>
+                            <div className={getNetChangeColor(change.new_quantity || 0)} style={{ fontSize: '9px', opacity: 0.8 }}>
+                              ({change.new_quantity! > 0 ? '+' : ''}{change.new_quantity})
+                            </div>
                           </div>
                         )}
                         {change.change_type === 'closed' && (
-                          <div className="text-red-600 font-medium" style={{ fontSize: '12px' }}>
-                            <div>{change.old_quantity}</div>
-                            <div style={{ fontSize: '10px' }}>↓</div>
-                            <div>0</div>
+                          <div className="font-medium" style={{ fontSize: '11px' }}>
+                            <div className={getPositionColor(change.old_quantity || 0)}>{change.old_quantity}</div>
+                            <div style={{ fontSize: '8px' }}>↓</div>
+                            <div className="text-gray-600">0</div>
+                            <div className={getNetChangeColor(-(change.old_quantity || 0))} style={{ fontSize: '9px', opacity: 0.8 }}>
+                              (-{change.old_quantity})
+                            </div>
                           </div>
                         )}
                         {change.change_type === 'price_change' && (
-                          <div className="text-orange-600 font-medium" style={{ fontSize: '12px' }}>
+                          <div className="text-orange-600 font-medium" style={{ fontSize: '11px' }}>
                             <div>{formatNumber(change.old_price || 0, { maximumFractionDigits: 1, compact: true })}</div>
-                            <div style={{ fontSize: '10px' }}>↓</div>
+                            <div style={{ fontSize: '8px' }}>↓</div>
                             <div>{formatNumber(change.new_price || 0, { maximumFractionDigits: 1, compact: true })}</div>
+                            <div className="text-orange-600" style={{ fontSize: '9px', opacity: 0.8 }}>
+                              ({change.new_price! > change.old_price! ? '+' : ''}{formatNumber((change.new_price || 0) - (change.old_price || 0), { maximumFractionDigits: 1, compact: true })})
+                            </div>
                           </div>
                         )}
                       </td>
