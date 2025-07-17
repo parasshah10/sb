@@ -5,8 +5,6 @@ import gzip
 import os
 from datetime import datetime, date, timedelta, time as time_obj
 from enum import Enum
-from apscheduler.schedulers.background import BackgroundScheduler
-from pytz import timezone
 
 # --- Configuration ---
 SIMULATION_MODE = False
@@ -20,27 +18,19 @@ SIM_DB_FILE = "simulation_data.db"
 SENSIBULL_URL = "https://oxide.sensibull.com/v1/compute/verified_by_sensibull/live_positions/snapshot/oculated-toy"
 HEADERS = {"accept": "application/json, text/plain, */*"}
 FETCH_INTERVAL_SECONDS = 15
-FETCH_JOB_ID = 'sensibull_data_fetch'
 
 UPSTOX_API_URL = "https://api.upstox.com/v2/market/timings"
 UPSTOX_HEADERS = {'Accept': 'application/json'}
 COMPRESSION_HOUR = 16
 SAFE_API_CHECK_HOUR = 9
-INDIA_TZ = timezone('Asia/Kolkata')
 
 # --- State Management ---
 class State(Enum):
     INITIALIZING = 1
-    WAITING_FOR_SCHEDULE = 2
+    WAITING_FOR_MARKET_OPEN = 2
     CAPTURING_DATA = 3
     POST_MARKET_TASKS = 4
     SLEEPING = 5
-
-app_state = {
-    "current_state": State.INITIALIZING,
-    "current_db_file": None,
-    "instrument_cache": {},
-}
 
 # --- Helper Functions ---
 
@@ -109,102 +99,75 @@ def insert_positions_data(db_file, payload, instrument_cache):
                 rows_inserted += 1
         return rows_inserted
 
-# --- Scheduler Job Functions ---
-
-def fetch_and_store_data():
+def fetch_and_store_data(db_file, instrument_cache):
     try:
-        print(f"[{datetime.now(INDIA_TZ).strftime('%H:%M:%S')}] Fetching data... ", end='')
+        print(f"[{datetime.now().strftime('%H:%M:%S')}] Fetching data... ", end='')
         response = requests.get(SENSIBULL_URL, headers=HEADERS, timeout=10)
         response.raise_for_status()
         data = response.json()
         if data.get('success') and 'payload' in data:
-            rows = insert_positions_data(app_state["current_db_file"], data['payload'], app_state["instrument_cache"])
+            rows = insert_positions_data(db_file, data['payload'], instrument_cache)
             print(f"Success! Inserted {rows} rows.")
         else:
             print("API call not successful or payload missing.")
     except Exception as e:
         print(f"\n[ERROR] An error occurred during fetch: {e}")
 
-def start_data_capture(scheduler):
-    if app_state["current_state"] != State.WAITING_FOR_SCHEDULE: return
-    
-    setup_database(app_state["current_db_file"])
-    app_state["instrument_cache"] = {}
-    
-    print(f"\n[{datetime.now(INDIA_TZ).strftime('%H:%M:%S')}] Market is OPEN. Starting interval data capture...")
-    app_state["current_state"] = State.CAPTURING_DATA
-    
-    fetch_and_store_data()
-    
-    scheduler.add_job(
-        fetch_and_store_data, 'interval', seconds=FETCH_INTERVAL_SECONDS,
-        id=FETCH_JOB_ID, max_instances=1, coalesce=True
-    )
-
-def stop_data_capture(scheduler):
-    if app_state["current_state"] != State.CAPTURING_DATA: return
-    
-    print(f"\n[{datetime.now(INDIA_TZ).strftime('%H:%M:%S')}] Market is CLOSED. Stopping data capture.")
-    app_state["current_state"] = State.POST_MARKET_TASKS
-    if scheduler.get_job(FETCH_JOB_ID):
-        scheduler.remove_job(FETCH_JOB_ID)
-
-def perform_post_market_tasks(date_to_compress=None, db_to_compress=None):
-    print(f"\n[{datetime.now(INDIA_TZ).strftime('%H:%M:%S')}] Performing post-market tasks.")
-    if db_to_compress: compress_db_file(db_to_compress)
-    elif date_to_compress:
-        file_to_compress = get_db_filename_for_date(date_to_compress)
-        compress_db_file(file_to_compress)
-    print("Post-market tasks complete. Switching to sleep mode.")
-    app_state["current_state"] = State.SLEEPING
-
-def run_simulation_mode(scheduler):
+def run_simulation_mode():
     print("="*50 + "\n===      RUNNING IN SIMULATION MODE      ===\n" + "="*50)
     
     sim_db_path = os.path.join(DATA_SUBFOLDER, SIM_DB_FILE)
     if os.path.exists(sim_db_path): os.remove(sim_db_path)
     
-    now = datetime.now(INDIA_TZ)
-    sim_open_time = now + timedelta(seconds=SIM_MARKET_OPEN_IN_SECONDS)
-    sim_close_time = sim_open_time + timedelta(seconds=SIM_MARKET_DURATION_SECONDS)
-    sim_compress_time = sim_close_time + timedelta(seconds=SIM_COMPRESSION_IN_SECONDS_AFTER_CLOSE)
+    setup_database(sim_db_path)
+    instrument_cache = {}
+    
+    start_time = datetime.now() + timedelta(seconds=SIM_MARKET_OPEN_IN_SECONDS)
+    close_time = start_time + timedelta(seconds=SIM_MARKET_DURATION_SECONDS)
+    compress_time = close_time + timedelta(seconds=SIM_COMPRESSION_IN_SECONDS_AFTER_CLOSE)
 
-    print(f"Simulation scheduled:\n  - Market Open:   {sim_open_time.strftime('%H:%M:%S')}\n  - Market Close:  {sim_close_time.strftime('%H:%M:%S')}\n  - Compression:   {sim_compress_time.strftime('%H:%M:%S')}")
+    print(f"Simulation will run:\n  - Market Open:   {start_time.strftime('%H:%M:%S')}\n  - Market Close:  {close_time.strftime('%H:%M:%S')}\n  - Compression:   {compress_time.strftime('%H:%M:%S')}")
     
-    app_state["current_db_file"] = sim_db_path
-    app_state["current_state"] = State.WAITING_FOR_SCHEDULE
+    while datetime.now() < start_time:
+        print(f"[{datetime.now().strftime('%H:%M:%S')}] Simulation waiting to start...", end='\r')
+        time.sleep(1)
     
-    scheduler.add_job(start_data_capture, 'date', run_date=sim_open_time, args=[scheduler])
-    scheduler.add_job(stop_data_capture, 'date', run_date=sim_close_time, args=[scheduler])
-    scheduler.add_job(perform_post_market_tasks, 'date', run_date=sim_compress_time, args=[None, sim_db_path])
+    print(f"\n[{datetime.now().strftime('%H:%M:%S')}] SIM: Market is OPEN.")
+    while datetime.now() < close_time:
+        fetch_and_store_data(sim_db_path, instrument_cache)
+        time.sleep(FETCH_INTERVAL_SECONDS)
+        
+    print(f"\n[{datetime.now().strftime('%H:%M:%S')}] SIM: Market is CLOSED.")
     
-    print("\nSimulation running. Waiting for scheduled events...")
-    try:
-        while app_state["current_state"] != State.SLEEPING: time.sleep(1)
-        print(f"\n[{datetime.now(INDIA_TZ).strftime('%H:%M:%S')}] Simulation cycle complete. Shutting down.")
-    except (KeyboardInterrupt, SystemExit): print("\n--- Simulation interrupted. Shutting down. ---")
+    while datetime.now() < compress_time:
+        print(f"[{datetime.now().strftime('%H:%M:%S')}] Simulation waiting for compression time...", end='\r')
+        time.sleep(1)
+        
+    print(f"\n[{datetime.now().strftime('%H:%M:%S')}] SIM: Performing post-market tasks.")
+    compress_db_file(sim_db_path)
+    print(f"\n[{datetime.now().strftime('%H:%M:%S')}] Simulation cycle complete.")
 
 # --- Main Autonomous Loop ---
 
 def main():
     os.makedirs(DATA_SUBFOLDER, exist_ok=True)
-    
-    scheduler = BackgroundScheduler(timezone=INDIA_TZ)
-    scheduler.start()
 
     if SIMULATION_MODE:
-        run_simulation_mode(scheduler)
-        scheduler.shutdown()
+        run_simulation_mode()
         return
 
-    print("--- Autonomous Data Capture Script (Scheduler Mode): Starting Up ---")
+    print("--- Autonomous Data Capture Script (Polling Mode): Starting Up ---")
+    current_state = State.INITIALIZING
+    current_db_file = None
+    instrument_cache = {}
     market_timings_today = None
     last_checked_date = None
     
     try:
         while True:
-            now_local = datetime.now(INDIA_TZ)
-            today = now_local.date()
+            now = datetime.now()
+            today = now.date()
+            current_time = now.time()
 
             if last_checked_date != today:
                 print(f"\n--- New Day Detected: {today.strftime('%Y-%m-%d')} ---")
@@ -214,47 +177,70 @@ def main():
 
                 market_timings_today = None
                 last_checked_date = today
-                app_state["current_state"] = State.INITIALIZING
+                current_state = State.INITIALIZING
                 
-                while datetime.now(INDIA_TZ).hour < SAFE_API_CHECK_HOUR:
-                    print(f"[{datetime.now(INDIA_TZ).strftime('%H:%M:%S')}] Pre-market sleep. Waiting for {SAFE_API_CHECK_HOUR}:00...", end='\r')
+                while datetime.now().hour < SAFE_API_CHECK_HOUR:
+                    print(f"[{datetime.now().strftime('%H:%M:%S')}] Pre-market sleep. Waiting for {SAFE_API_CHECK_HOUR}:00...", end='\r')
                     time.sleep(30)
 
-                print(f"\n[{datetime.now(INDIA_TZ).strftime('%H:%M:%S')}] Safe hour reached. Checking market status...")
+                print(f"\n[{datetime.now().strftime('%H:%M:%S')}] Safe hour reached. Checking market status...")
                 market_timings_today = get_market_timings_for_date(today)
 
                 if market_timings_today:
                     market_open, market_close = market_timings_today['open'], market_timings_today['close']
-                    print(f"Today is a trading day. Scheduling jobs for {market_open.strftime('%H:%M')} - {market_close.strftime('%H:%M')}")
-
-                    app_state["current_db_file"] = get_db_filename_for_date(today)
-                    app_state["current_state"] = State.WAITING_FOR_SCHEDULE
-
-                    scheduler.add_job(start_data_capture, 'date', run_date=datetime.combine(today, market_open, tzinfo=INDIA_TZ), args=[scheduler])
-                    scheduler.add_job(stop_data_capture, 'date', run_date=datetime.combine(today, market_close, tzinfo=INDIA_TZ), args=[scheduler])
-                    scheduler.add_job(perform_post_market_tasks, 'date', run_date=datetime.combine(today, time_obj(COMPRESSION_HOUR, 0), tzinfo=INDIA_TZ), args=[last_trading_day_for_compression, None])
-
-                    time_str = f"[{now_local.strftime('%H:%M:%S')}]"
-                    if now_local.hour >= COMPRESSION_HOUR:
-                        print(f"{time_str} [Catch-Up] It's past compression time. Running cleanup.")
-                        perform_post_market_tasks(last_trading_day_for_compression, None)
-                    elif now_local.time() >= market_close:
-                        print(f"{time_str} [Catch-Up] It's past market close. Finalizing capture state.")
-                        stop_data_capture(scheduler)
-                    elif now_local.time() >= market_open:
-                        print(f"{time_str} [Catch-Up] It's mid-market. Starting data capture immediately.")
-                        start_data_capture(scheduler)
+                    print(f"Today is a trading day. Market Hours: {market_open.strftime('%H:%M')} - {market_close.strftime('%H:%M')}")
+                    
+                    if now.hour >= COMPRESSION_HOUR:
+                        print(f"[{current_time.strftime('%H:%M:%S')}] [Catch-Up] It's past compression time. Running cleanup.")
+                        perform_post_market_tasks(last_trading_day_for_compression)
+                        current_state = State.SLEEPING
+                    elif current_time >= market_close:
+                        print(f"[{current_time.strftime('%H:%M:%S')}] [Catch-Up] It's past market close.")
+                        current_state = State.POST_MARKET_TASKS
+                    elif current_time >= market_open:
+                        print(f"[{current_time.strftime('%H:%M:%S')}] [Catch-Up] It's mid-market. Starting data capture.")
+                        current_state = State.CAPTURING_DATA
+                    else:
+                        current_state = State.WAITING_FOR_MARKET_OPEN
                 else:
-                    print("Today is a market holiday or weekend. Sleeping.")
-                    app_state["current_state"] = State.SLEEPING
+                    print("Today is a market holiday or weekend.")
+                    current_state = State.SLEEPING
+            
+            if current_state == State.WAITING_FOR_MARKET_OPEN:
+                print(f"[{current_time.strftime('%H:%M:%S')}] Waiting for market to open at {market_open.strftime('%H:%M')}...", end='\r')
+                if datetime.now().time() >= market_open:
+                    print(f"\n[{datetime.now().strftime('%H:%M:%S')}] Market is OPEN.")
+                    current_state = State.CAPTURING_DATA
+                else:
+                    time.sleep(1)
 
-            print(f"[{datetime.now(INDIA_TZ).strftime('%H:%M:%S')}] Main thread status: {app_state['current_state'].name}. Sleeping...", end='\r')
-            time.sleep(60)
+            elif current_state == State.CAPTURING_DATA:
+                if current_db_file is None: # Just-in-time setup on first capture
+                    current_db_file = get_db_filename_for_date(today)
+                    instrument_cache = {}
+                    setup_database(current_db_file)
+                
+                if datetime.now().time() < market_close:
+                    fetch_and_store_data(current_db_file, instrument_cache)
+                    time.sleep(FETCH_INTERVAL_SECONDS)
+                else:
+                    print(f"\n[{datetime.now().strftime('%H:%M:%S')}] Market is CLOSED.")
+                    current_state = State.POST_MARKET_TASKS
+
+            elif current_state == State.POST_MARKET_TASKS:
+                print(f"[{current_time.strftime('%H:%M:%S')}] Performing post-market tasks.")
+                if last_trading_day_for_compression:
+                    db_to_compress = get_db_filename_for_date(last_trading_day_for_compression)
+                    compress_db_file(db_to_compress)
+                print("Post-market tasks complete. Switching to sleep mode.")
+                current_state = State.SLEEPING
+            
+            elif current_state == State.SLEEPING:
+                print(f"[{current_time.strftime('%H:%M:%S')}] Main thread status: {current_state.name}. Sleeping...", end='\r')
+                time.sleep(60)
 
     except (KeyboardInterrupt, SystemExit):
-        print("\n--- Shutting down scheduler and script ---")
-    finally:
-        scheduler.shutdown()
+        print("\n--- Shutting down script ---")
 
 if __name__ == "__main__":
     main()
