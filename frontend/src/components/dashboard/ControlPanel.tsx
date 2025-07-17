@@ -3,6 +3,7 @@ import { DatePicker } from './DatePicker';
 import { DaySummary } from './DaySummary';
 import { FilterControl } from './FilterControl';
 import { UnderlyingSelector } from './UnderlyingSelector';
+import { DisplayModeToggle } from './DisplayModeToggle';
 import { useStore } from '@/store/useStore';
 import { useTradingData } from '@/hooks/useTradingData';
 import {
@@ -56,6 +57,8 @@ export function ControlPanel() {
             </Button>
             
             <UnderlyingSelector />
+            
+            <DisplayModeToggle />
             
             <Button
               variant={chartSettings.showTradeMarkers ? 'default' : 'outline'}
@@ -120,6 +123,8 @@ export function ControlPanel() {
           </Button>
           
           <UnderlyingSelector />
+          
+          <DisplayModeToggle />
           
           <Button
             variant={chartSettings.showTradeMarkers ? 'default' : 'outline'}

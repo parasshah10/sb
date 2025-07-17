@@ -84,6 +84,7 @@ export interface ChartSettings {
   showTradeMarkers: boolean;
   showMarketContext: boolean;
   isFullscreen: boolean;
+  displayMode: 'quantity' | 'lots'; // Toggle between showing raw quantity or lots
 }
 
 export interface FilterOption {

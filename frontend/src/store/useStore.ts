@@ -34,6 +34,7 @@ interface AppState {
   setSelectedFilters: (filters: string[]) => void;
   setAvailableUnderlyings: (underlyings: string[]) => void;
   updateChartSettings: (settings: Partial<ChartSettings>) => void;
+  loadDisplayModeFromStorage: () => void;
   setViewMode: (mode: ViewMode['type']) => void;
   setTooltipVisible: (visible: boolean) => void;
   setTooltipPosition: (position: { x: number; y: number } | null) => void;
@@ -64,6 +65,7 @@ export const useStore = create<AppState>((set, get) => ({
     showTradeMarkers: true,
     showMarketContext: true,
     isFullscreen: false,
+    displayMode: 'quantity', // Always start with quantity to avoid hydration mismatch
   },
   
   viewMode: 'expanded',
@@ -89,9 +91,29 @@ export const useStore = create<AppState>((set, get) => ({
   setAvailableUnderlyings: (underlyings: string[]) => set({ availableUnderlyings: underlyings }),
 
   updateChartSettings: (settings) =>
-    set((state) => ({
-      chartSettings: { ...state.chartSettings, ...settings },
-    })),
+    set((state) => {
+      const newSettings = { ...state.chartSettings, ...settings };
+      
+      // Save displayMode to localStorage when it changes
+      if (settings.displayMode && typeof window !== 'undefined') {
+        localStorage.setItem('displayMode', settings.displayMode);
+      }
+      
+      return {
+        chartSettings: newSettings,
+      };
+    }),
+
+  loadDisplayModeFromStorage: () => {
+    if (typeof window !== 'undefined') {
+      const savedMode = localStorage.getItem('displayMode') as 'quantity' | 'lots';
+      if (savedMode && (savedMode === 'quantity' || savedMode === 'lots')) {
+        set((state) => ({
+          chartSettings: { ...state.chartSettings, displayMode: savedMode },
+        }));
+      }
+    }
+  },
   
   setViewMode: (mode: ViewMode['type']) => set({ viewMode: mode }),
   setTooltipVisible: (visible: boolean) => set({ isTooltipVisible: visible }),

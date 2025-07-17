@@ -1,6 +1,8 @@
 import { SnapshotData, ViewMode } from '@/types';
 import { formatTime, formatCurrency, formatNumber, getPnlColor } from '@/lib/utils';
 import { normalizeOptionType, getOptionTypeColor, compareOptionTypes } from '@/lib/optionUtils';
+import { formatQuantityDisplay, formatChangeDisplay } from '@/lib/lotUtils';
+import { useStore } from '@/store/useStore';
 import { X, ChevronLeft, ChevronRight } from 'lucide-react';
 import { motion, AnimatePresence } from 'framer-motion';
 import { useEffect, useRef, useState } from 'react';
@@ -354,6 +356,7 @@ function ExpandedView({
   canNavigatePrev?: boolean;
   canNavigateNext?: boolean;
 }) {
+  const { chartSettings } = useStore();
   const [sortField, setSortField] = useState<SortField | null>(null);
   const [sortDirection, setSortDirection] = useState<SortDirection>(null);
 
@@ -548,7 +551,7 @@ function ExpandedView({
                 className="flex items-center justify-center gap-0.5 hover:text-blue-600 transition-colors w-full"
                 style={{ fontSize: '10px' }}
               >
-                Qty {getSortIcon('qty')}
+                {chartSettings.displayMode === 'lots' ? 'Lots' : 'Qty'} {getSortIcon('qty')}
               </button>
             </th>
             <th className="text-center py-1 font-medium text-gray-700 px-0" style={{ width: '45px', padding: '2px 1px', fontSize: '10px' }}>
@@ -605,7 +608,7 @@ function ExpandedView({
                   {position.instrument.strike}
                 </td>
                 <td className={`text-right font-medium font-mono ${position.quantity > 0 ? 'text-green-600' : position.quantity < 0 ? 'text-red-600' : 'text-gray-900'}`} style={{ width: '40px', padding: '4px 2px', fontSize: '14px' }}>
-                  {position.quantity}
+                  {formatQuantityDisplay(position.quantity, position.instrument.underlying_symbol, chartSettings.displayMode)}
                 </td>
                 <td className="text-right font-mono" style={{ width: '45px', padding: '4px 2px', fontSize: '14px' }}>
                   {formatNumber(position.avg_price, { 
@@ -619,9 +622,9 @@ function ExpandedView({
                     compact: true 
                   })}
                 </td>
-                <td className={`text-right font-bold font-mono ${getPnlColor(position.unbooked_pnl)}`} style={{ fontSize: '14px', width: '50px', padding: '4px 2px' }}>
-                  {formatNumber(position.unbooked_pnl, {
-                    maximumFractionDigits: (Math.abs(position.unbooked_pnl) >= 1000 && Math.abs(position.unbooked_pnl) < 10000) ? 1 : 0,
+                <td className={`text-right font-bold font-mono ${getPnlColor(position.quantity === 0 ? position.booked_pnl : position.unbooked_pnl)}`} style={{ fontSize: '14px', width: '50px', padding: '4px 2px' }}>
+                  {formatNumber(position.quantity === 0 ? position.booked_pnl : position.unbooked_pnl, {
+                    maximumFractionDigits: Math.abs(position.quantity === 0 ? position.booked_pnl : position.unbooked_pnl) >= 1000 ? 1 : 0,
                     compact: true
                   })}
                 </td>
@@ -639,6 +642,7 @@ function DeltaView({
 }: { 
   snapshot: SnapshotData;
 }) {
+  const { chartSettings } = useStore();
   const hasTradeMarker = snapshot.trade_marker && snapshot.trade_marker.type !== 'none';
 
   // Helper function to get change type color and icon
@@ -707,7 +711,7 @@ function DeltaView({
                   Action
                 </th>
                 <th className="text-center py-1 font-medium text-gray-700 px-0" style={{ width: '60px', padding: '2px 1px', fontSize: '10px' }}>
-                  Change
+                  {chartSettings.displayMode === 'lots' ? 'Lots Δ' : 'Change'}
                 </th>
                 <th className="text-center py-1 font-medium text-gray-700 px-0" style={{ width: '45px', padding: '2px 1px', fontSize: '10px' }}>
                   Price
@@ -766,34 +770,70 @@ function DeltaView({
                       <td className="text-center font-mono" style={{ width: '60px', padding: '2px 1px' }}>
                         {change.change_type === 'quantity_change' && (
                           <div className="font-medium" style={{ fontSize: '11px' }}>
-                            <div className={oldQtyColor}>{change.old_quantity}</div>
-                            <div style={{ fontSize: '8px' }}>↓</div>
-                            <div className={newQtyColor}>{change.new_quantity}</div>
-                            <div className={netChangeColor} style={{ fontSize: '9px', opacity: 0.8 }}>
-                              ({netChange > 0 ? '+' : ''}{netChange})
-                            </div>
+                            {(() => {
+                              const changeDisplay = formatChangeDisplay(
+                                change.old_quantity || 0,
+                                change.new_quantity || 0,
+                                instrument?.underlying_symbol || '',
+                                chartSettings.displayMode
+                              );
+                              return (
+                                <>
+                                  <div className={oldQtyColor}>{changeDisplay.old}</div>
+                                  <div style={{ fontSize: '8px' }}>↓</div>
+                                  <div className={newQtyColor}>{changeDisplay.new}</div>
+                                  <div className={netChangeColor} style={{ fontSize: '9px', opacity: 0.8 }}>
+                                    ({changeDisplay.net})
+                                  </div>
+                                </>
+                              );
+                            })()}
                           </div>
                         )}
                         {change.change_type === 'new' && (
                           <div className="font-medium" style={{ fontSize: '11px' }}>
-                            <div className="text-gray-600">0</div>
-                            <div style={{ fontSize: '8px' }}>↓</div>
-                            <div className={getPositionColor(change.new_quantity || 0)}>
-                              {change.new_quantity! > 0 ? '+' : ''}{change.new_quantity}
-                            </div>
-                            <div className={getNetChangeColor(change.new_quantity || 0)} style={{ fontSize: '9px', opacity: 0.8 }}>
-                              ({change.new_quantity! > 0 ? '+' : ''}{change.new_quantity})
-                            </div>
+                            {(() => {
+                              const changeDisplay = formatChangeDisplay(
+                                0,
+                                change.new_quantity || 0,
+                                instrument?.underlying_symbol || '',
+                                chartSettings.displayMode
+                              );
+                              return (
+                                <>
+                                  <div className="text-gray-600">{changeDisplay.old}</div>
+                                  <div style={{ fontSize: '8px' }}>↓</div>
+                                  <div className={getPositionColor(change.new_quantity || 0)}>
+                                    {changeDisplay.new}
+                                  </div>
+                                  <div className={getNetChangeColor(change.new_quantity || 0)} style={{ fontSize: '9px', opacity: 0.8 }}>
+                                    ({changeDisplay.net})
+                                  </div>
+                                </>
+                              );
+                            })()}
                           </div>
                         )}
                         {change.change_type === 'closed' && (
                           <div className="font-medium" style={{ fontSize: '11px' }}>
-                            <div className={getPositionColor(change.old_quantity || 0)}>{change.old_quantity}</div>
-                            <div style={{ fontSize: '8px' }}>↓</div>
-                            <div className="text-gray-600">0</div>
-                            <div className={getNetChangeColor(-(change.old_quantity || 0))} style={{ fontSize: '9px', opacity: 0.8 }}>
-                              (-{change.old_quantity})
-                            </div>
+                            {(() => {
+                              const changeDisplay = formatChangeDisplay(
+                                change.old_quantity || 0,
+                                0,
+                                instrument?.underlying_symbol || '',
+                                chartSettings.displayMode
+                              );
+                              return (
+                                <>
+                                  <div className={getPositionColor(change.old_quantity || 0)}>{changeDisplay.old}</div>
+                                  <div style={{ fontSize: '8px' }}>↓</div>
+                                  <div className="text-gray-600">{changeDisplay.new}</div>
+                                  <div className={getNetChangeColor(-(change.old_quantity || 0))} style={{ fontSize: '9px', opacity: 0.8 }}>
+                                    ({changeDisplay.net})
+                                  </div>
+                                </>
+                              );
+                            })()}
                           </div>
                         )}
                         {change.change_type === 'price_change' && (
