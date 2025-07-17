@@ -65,6 +65,7 @@ class TradeAnalyzer:
                     changes.append(PositionChange(
                         instrument_id=instrument_id,
                         instrument_symbol=curr_pos.instrument.symbol,
+                        instrument=curr_pos.instrument,
                         change_type="new",
                         old_quantity=0,
                         new_quantity=curr_pos.quantity,
@@ -77,6 +78,7 @@ class TradeAnalyzer:
                     changes.append(PositionChange(
                         instrument_id=instrument_id,
                         instrument_symbol=prev_pos.instrument.symbol,
+                        instrument=prev_pos.instrument,
                         change_type="closed",
                         old_quantity=prev_pos.quantity,
                         new_quantity=0,
@@ -94,6 +96,7 @@ class TradeAnalyzer:
                         changes.append(PositionChange(
                             instrument_id=instrument_id,
                             instrument_symbol=curr_pos.instrument.symbol,
+                            instrument=curr_pos.instrument,
                             change_type=change_type,
                             old_quantity=prev_pos.quantity,
                             new_quantity=curr_pos.quantity,

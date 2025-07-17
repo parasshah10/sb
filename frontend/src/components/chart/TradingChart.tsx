@@ -120,9 +120,28 @@ export function TradingChart() {
         return;
       }
 
-      const snapshot = currentData.timeseries.find(
-        (s) => new Date(s.timestamp).getTime() / 1000 === param.time
+      // Find snapshot using deduplicated data to match chart data
+      const chartData: ChartData[] = currentData.timeseries.map((snapshot) => ({
+        time: new Date(snapshot.timestamp).getTime() / 1000,
+        value: snapshot.total_pnl,
+        underlying: snapshot.underlying_price,
+        snapshot,
+      }));
+      
+      const uniqueChartData = chartData.reduce((acc: ChartData[], current) => {
+        const existingIndex = acc.findIndex(item => item.time === current.time);
+        if (existingIndex === -1) {
+          acc.push(current);
+        } else {
+          acc[existingIndex] = current;
+        }
+        return acc;
+      }, []).sort((a, b) => a.time - b.time);
+
+      const chartDataItem = uniqueChartData.find(
+        (item) => item.time === param.time
       );
+      const snapshot = chartDataItem?.snapshot;
 
       if (snapshot) {
         setSelectedSnapshot(snapshot);
@@ -158,8 +177,20 @@ export function TradingChart() {
       snapshot,
     }));
   
+    // Remove duplicates and ensure ascending order by time
+    const uniqueChartData = chartData.reduce((acc: ChartData[], current) => {
+      const existingIndex = acc.findIndex(item => item.time === current.time);
+      if (existingIndex === -1) {
+        acc.push(current);
+      } else {
+        // Keep the latest data for duplicate timestamps
+        acc[existingIndex] = current;
+      }
+      return acc;
+    }, []).sort((a, b) => a.time - b.time);
+  
     // Set P&L data - filter out invalid values
-    const pnlData = chartData
+    const pnlData = uniqueChartData
       .filter((d) => typeof d.value === 'number' && !isNaN(d.value))
       .map((d) => ({ 
         time: d.time as Time, 
@@ -170,7 +201,7 @@ export function TradingChart() {
   
     // Set underlying data - filter out null/undefined/invalid values
     if (chartSettings.showUnderlying) {
-      const underlyingData = chartData
+      const underlyingData = uniqueChartData
         .filter((d) => 
           d.underlying !== null && 
           d.underlying !== undefined && 
@@ -185,24 +216,8 @@ export function TradingChart() {
       underlyingSeriesRef.current.setData(underlyingData);
     }
   
-    // Add trade markers
-    if (chartSettings.showTradeMarkers) {
-      const markers = chartData
-        .filter((d) => 
-          d.snapshot && 
-          d.snapshot.trade_marker && 
-          d.snapshot.trade_marker.type !== 'none'
-        )
-        .map((d) => ({
-          time: d.time as Time,
-          position: 'belowBar' as const,
-          color: d.snapshot!.trade_marker!.type === 'square_up' ? '#dc2626' : '#3b82f6',
-          shape: 'circle' as const,
-          text: d.snapshot!.trade_marker!.type === 'square_up' ? 'S' : 'T',
-        }));
-  
-      pnlSeriesRef.current.setMarkers(markers);
-    }
+    // Note: Trade markers and selection indicators are now handled 
+    // in the separate useEffect for selection indicator
   
     // Fit content
     chartRef.current?.timeScale().fitContent();
@@ -241,6 +256,136 @@ export function TradingChart() {
     setSelectedSnapshot(null);
   };
 
+  // Update markers (trade markers + selection indicator)
+  useEffect(() => {
+    if (!pnlSeriesRef.current || !currentData) return;
+
+    // Get all trade markers - need to access uniqueChartData from the data effect
+    // For now, recreate the deduplication logic here
+    const chartData: ChartData[] = currentData.timeseries.map((snapshot) => ({
+      time: new Date(snapshot.timestamp).getTime() / 1000,
+      value: snapshot.total_pnl,
+      underlying: snapshot.underlying_price,
+      snapshot,
+    }));
+    
+    const uniqueChartData = chartData.reduce((acc: ChartData[], current) => {
+      const existingIndex = acc.findIndex(item => item.time === current.time);
+      if (existingIndex === -1) {
+        acc.push(current);
+      } else {
+        acc[existingIndex] = current;
+      }
+      return acc;
+    }, []).sort((a, b) => a.time - b.time);
+
+    const tradeMarkers = chartSettings.showTradeMarkers ? 
+      uniqueChartData
+        .filter((chartDataItem) => 
+          chartDataItem.snapshot?.trade_marker && 
+          chartDataItem.snapshot.trade_marker.type !== 'none'
+        )
+        .map((chartDataItem) => ({
+          time: chartDataItem.time as Time,
+          position: 'belowBar' as const,
+          color: chartDataItem.snapshot!.trade_marker!.type === 'square_up' ? '#dc2626' : '#3b82f6',
+          shape: 'circle' as const,
+          text: chartDataItem.snapshot!.trade_marker!.type === 'square_up' ? 'S' : 'T',
+        })) : [];
+
+    let allMarkers = [...tradeMarkers];
+
+    // Add selection indicator if there's a selected snapshot
+    if (selectedSnapshot) {
+      const selectedTime = new Date(selectedSnapshot.timestamp).getTime() / 1000;
+      
+      const selectionMarker = {
+        time: selectedTime as Time,
+        position: 'aboveBar' as const, // Above the chart line
+        color: '#f59e0b', // Back to gold since you said it was better
+        shape: 'arrowDown' as const,
+        text: '', // NO TEXT - just the arrow shape itself
+        size: 3, // Bigger size for better visibility
+      };
+
+      allMarkers.push(selectionMarker);
+    }
+
+    // Sort all markers by time to ensure ascending order
+    allMarkers.sort((a, b) => (a.time as number) - (b.time as number));
+
+    // Set all markers
+    pnlSeriesRef.current.setMarkers(allMarkers);
+  }, [currentData, chartSettings.showTradeMarkers, selectedSnapshot]);
+
+  // Navigation between trade events
+  const handleNavigate = (direction: 'prev' | 'next') => {
+    if (!currentData || !selectedSnapshot) return;
+
+    // Find all snapshots with trade markers
+    const tradeSnapshots = currentData.timeseries.filter(
+      snapshot => snapshot.trade_marker && snapshot.trade_marker.type !== 'none'
+    );
+
+    if (tradeSnapshots.length === 0) return;
+
+    // Find current snapshot's timestamp
+    const currentTimestamp = selectedSnapshot.timestamp;
+    
+    if (direction === 'next') {
+      // Find the first trade snapshot after the current timestamp
+      const nextTradeSnapshot = tradeSnapshots.find(
+        snapshot => snapshot.timestamp > currentTimestamp
+      );
+      if (nextTradeSnapshot) {
+        setSelectedSnapshot(nextTradeSnapshot);
+      }
+    } else {
+      // Find the last trade snapshot before the current timestamp
+      const prevTradeSnapshot = tradeSnapshots
+        .slice()
+        .reverse()
+        .find(snapshot => snapshot.timestamp < currentTimestamp);
+      if (prevTradeSnapshot) {
+        setSelectedSnapshot(prevTradeSnapshot);
+      }
+    }
+  };
+
+  // Check if navigation is possible
+  const getNavigationState = () => {
+    if (!currentData || !selectedSnapshot) {
+      return { canNavigatePrev: false, canNavigateNext: false };
+    }
+
+    const tradeSnapshots = currentData.timeseries.filter(
+      snapshot => snapshot.trade_marker && snapshot.trade_marker.type !== 'none'
+    );
+
+    if (tradeSnapshots.length === 0) {
+      return { canNavigatePrev: false, canNavigateNext: false };
+    }
+
+    const currentTimestamp = selectedSnapshot.timestamp;
+
+    // Check if there's a trade snapshot after the current timestamp
+    const hasNext = tradeSnapshots.some(
+      snapshot => snapshot.timestamp > currentTimestamp
+    );
+
+    // Check if there's a trade snapshot before the current timestamp
+    const hasPrev = tradeSnapshots.some(
+      snapshot => snapshot.timestamp < currentTimestamp
+    );
+
+    return {
+      canNavigatePrev: hasPrev,
+      canNavigateNext: hasNext
+    };
+  };
+
+  const { canNavigatePrev, canNavigateNext } = getNavigationState();
+
   if (loading) {
     return (
       <div className="h-full flex items-center justify-center">
@@ -257,12 +402,16 @@ export function TradingChart() {
         style={{ minHeight: '400px' }}
       />
       
+      
       {selectedSnapshot && (
         <ChartTooltip
           snapshot={selectedSnapshot}
           viewMode={viewMode}
           onClose={handleCloseTooltip}
           onViewModeChange={setViewMode}
+          onNavigate={handleNavigate}
+          canNavigatePrev={canNavigatePrev}
+          canNavigateNext={canNavigateNext}
         />
       )}
     </div>

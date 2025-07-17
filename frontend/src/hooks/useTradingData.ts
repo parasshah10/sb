@@ -9,11 +9,13 @@ export function useTradingData() {
     currentData,
     loading,
     error,
+    selectedFilters,
     setTradingDays,
     setCurrentData,
     setLoading,
     setError,
     resetState,
+    setAvailableFilters,
   } = useStore();
 
   const loadTradingDays = useCallback(async () => {
@@ -29,39 +31,57 @@ export function useTradingData() {
     }
   }, [setTradingDays, setLoading, setError]);
 
-  const loadTradingDayData = useCallback(async (date: string) => {
+  const loadDataForDate = useCallback(async (date: string, filters: string[]) => {
     try {
       setLoading(true);
       setError(null);
-      const data = await api.getTradingDayData(date);
-      setCurrentData(data);
+      
+      // Fetch filters and data in parallel
+      const [filterData, dayData] = await Promise.all([
+        api.getAvailableFilters(date),
+        api.getTradingDayData(date, filters)
+      ]);
+
+      setAvailableFilters(filterData.filters);
+      setCurrentData(dayData);
+
     } catch (err) {
       setError(err instanceof Error ? err.message : 'Failed to load trading data');
       setCurrentData(null);
+      setAvailableFilters([]);
     } finally {
       setLoading(false);
     }
-  }, [setCurrentData, setLoading, setError]);
+  }, [setCurrentData, setLoading, setError, setAvailableFilters]);
 
-  const refreshData = useCallback(() => {
+  const refreshData = useCallback(async () => {
     if (selectedDate) {
-      loadTradingDayData(selectedDate);
+      try {
+        // Clear backend cache first
+        await api.refreshCache();
+        // Then reload the data
+        loadDataForDate(selectedDate, selectedFilters);
+      } catch (err) {
+        console.warn('Failed to clear cache, proceeding with data reload:', err);
+        // Still try to reload data even if cache clear fails
+        loadDataForDate(selectedDate, selectedFilters);
+      }
     }
-  }, [selectedDate, loadTradingDayData]);
+  }, [selectedDate, selectedFilters, loadDataForDate]);
 
   // Load trading days on mount
   useEffect(() => {
     loadTradingDays();
   }, [loadTradingDays]);
 
-  // Load data when selected date changes
+  // Load data when selected date or filters change
   useEffect(() => {
     if (selectedDate) {
-      loadTradingDayData(selectedDate);
+      loadDataForDate(selectedDate, selectedFilters);
     } else {
       resetState();
     }
-  }, [selectedDate, loadTradingDayData, resetState]);
+  }, [selectedDate, selectedFilters, loadDataForDate, resetState]);
 
   return {
     tradingDays,
@@ -69,6 +89,5 @@ export function useTradingData() {
     loading,
     error,
     refreshData,
-    loadTradingDayData,
   };
 }

@@ -21,6 +21,7 @@ export interface PositionDetail {
 export interface PositionChange {
   instrument_id: number;
   instrument_symbol: string;
+  instrument?: InstrumentInfo;
   change_type: 'new' | 'closed' | 'quantity_change' | 'price_change';
   old_quantity?: number;
   new_quantity?: number;
@@ -83,4 +84,10 @@ export interface ChartSettings {
   showTradeMarkers: boolean;
   showMarketContext: boolean;
   isFullscreen: boolean;
+}
+
+export interface FilterOption {
+  underlying_symbol: string;
+  expiry: string;
+  key: string;
 }

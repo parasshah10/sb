@@ -1,5 +1,5 @@
 import { create } from 'zustand';
-import { TradingDayData, SnapshotData, ChartSettings, ViewMode } from '@/types';
+import { TradingDayData, SnapshotData, ChartSettings, ViewMode, FilterOption } from '@/types';
 
 interface AppState {
   // Data
@@ -9,6 +9,10 @@ interface AppState {
   selectedSnapshot: SnapshotData | null;
   loading: boolean;
   error: string | null;
+  
+  // Filters
+  availableFilters: FilterOption[];
+  selectedFilters: string[]; // array of filter keys
   
   // Chart settings
   chartSettings: ChartSettings;
@@ -25,6 +29,8 @@ interface AppState {
   setSelectedSnapshot: (snapshot: SnapshotData | null) => void;
   setLoading: (loading: boolean) => void;
   setError: (error: string | null) => void;
+  setAvailableFilters: (filters: FilterOption[]) => void;
+  setSelectedFilters: (filters: string[]) => void;
   updateChartSettings: (settings: Partial<ChartSettings>) => void;
   setViewMode: (mode: ViewMode['type']) => void;
   setTooltipVisible: (visible: boolean) => void;
@@ -32,15 +38,24 @@ interface AppState {
   resetState: () => void;
 }
 
-export const useStore = create<AppState>((set) => ({
+export const useStore = create<AppState>((set, get) => ({
   // Initial state
-  selectedDate: new Date().toISOString().split('T')[0],
+  selectedDate: (() => {
+    const today = new Date();
+    const year = today.getFullYear();
+    const month = String(today.getMonth() + 1).padStart(2, '0');
+    const day = String(today.getDate()).padStart(2, '0');
+    return `${year}-${month}-${day}`;
+  })(),
   tradingDays: [],
   currentData: null,
   selectedSnapshot: null,
   loading: false,
   error: null,
   
+  availableFilters: [],
+  selectedFilters: [],
+
   chartSettings: {
     showUnderlying: true,
     showTradeMarkers: true,
@@ -48,18 +63,25 @@ export const useStore = create<AppState>((set) => ({
     isFullscreen: false,
   },
   
-  viewMode: 'default',
+  viewMode: 'expanded',
   isTooltipVisible: false,
   tooltipPosition: null,
   
   // Actions
-  setSelectedDate: (date: string) => set({ selectedDate: date }),
+  setSelectedDate: (date: string) => set({ 
+    selectedDate: date, 
+    selectedFilters: [], // Reset filters when date changes
+    availableFilters: [],
+  }),
   setTradingDays: (days: string[]) => set({ tradingDays: days }),
   setCurrentData: (data: TradingDayData | null) => set({ currentData: data }),
   setSelectedSnapshot: (snapshot: SnapshotData | null) => set({ selectedSnapshot: snapshot }),
   setLoading: (loading: boolean) => set({ loading }),
   setError: (error: string | null) => set({ error }),
   
+  setAvailableFilters: (filters: FilterOption[]) => set({ availableFilters: filters }),
+  setSelectedFilters: (filters: string[]) => set({ selectedFilters: filters }),
+
   updateChartSettings: (settings) =>
     set((state) => ({
       chartSettings: { ...state.chartSettings, ...settings },
@@ -77,5 +99,7 @@ export const useStore = create<AppState>((set) => ({
       error: null,
       isTooltipVisible: false,
       tooltipPosition: null,
+      selectedFilters: [],
+      availableFilters: [],
     }),
 }));

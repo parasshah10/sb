@@ -29,6 +29,7 @@ class PositionDetail(BaseModel):
 class PositionChange(BaseModel):
     instrument_id: int
     instrument_symbol: str
+    instrument: Optional[InstrumentInfo] = None  # Include full instrument details
     change_type: str  # "new", "closed", "quantity_change", "price_change"
     old_quantity: Optional[int] = None
     new_quantity: Optional[int] = None
@@ -67,6 +68,14 @@ class TradingDayData(BaseModel):
 class TradingDaysResponse(BaseModel):
     available_dates: List[str]
     total_days: int
+
+class FilterOption(BaseModel):
+    underlying_symbol: str
+    expiry: str
+    key: str
+
+class AvailableFiltersResponse(BaseModel):
+    filters: List[FilterOption]
 
 class APIResponse(BaseModel):
     success: bool

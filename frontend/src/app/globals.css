@@ -50,19 +50,33 @@
 
 /* Custom scrollbar */
 .custom-scrollbar::-webkit-scrollbar {
-  width: 6px;
+  width: 6px; /* Back to reasonable width */
 }
 
 .custom-scrollbar::-webkit-scrollbar-track {
-  background: #f1f5f9;
-  border-radius: 3px;
+  background: transparent; /* No track background */
+  border-radius: 0;
 }
 
 .custom-scrollbar::-webkit-scrollbar-thumb {
-  background: #cbd5e1;
-  border-radius: 3px;
+  background: rgba(0, 0, 0, 0.2); /* Subtle thumb */
+  border-radius: 2px;
 }
 
 .custom-scrollbar::-webkit-scrollbar-thumb:hover {
-  background: #94a3b8;
+  background: rgba(0, 0, 0, 0.3);
+}
+
+/* Horizontal scrollbar styling */
+.custom-scrollbar::-webkit-scrollbar:horizontal {
+  height: 3px; /* Much thinner horizontal scrollbar */
+}
+
+.custom-scrollbar::-webkit-scrollbar-thumb:horizontal {
+  background: rgba(0, 0, 0, 0.2);
+  border-radius: 2px;
+}
+
+.custom-scrollbar::-webkit-scrollbar-thumb:horizontal:hover {
+  background: rgba(0, 0, 0, 0.3);
 }
