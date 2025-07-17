@@ -269,6 +269,13 @@ export function TradingChart() {
       snapshot,
     }));
     
+    // For trade markers, we need to preserve ALL snapshots with trade markers, not deduplicate
+    const allTradeMarkerSnapshots = chartData.filter(item => 
+      item.snapshot?.trade_marker && 
+      item.snapshot.trade_marker.type !== 'none'
+    );
+
+    // For chart data (P&L line), we still deduplicate by timestamp
     const uniqueChartData = chartData.reduce((acc: ChartData[], current) => {
       const existingIndex = acc.findIndex(item => item.time === current.time);
       if (existingIndex === -1) {
@@ -280,17 +287,14 @@ export function TradingChart() {
     }, []).sort((a, b) => a.time - b.time);
 
     const tradeMarkers = chartSettings.showTradeMarkers ? 
-      uniqueChartData
-        .filter((chartDataItem) => 
-          chartDataItem.snapshot?.trade_marker && 
-          chartDataItem.snapshot.trade_marker.type !== 'none'
-        )
+      allTradeMarkerSnapshots
         .map((chartDataItem) => ({
           time: chartDataItem.time as Time,
           position: 'belowBar' as const,
           color: chartDataItem.snapshot!.trade_marker!.type === 'square_up' ? '#dc2626' : '#3b82f6',
           shape: 'circle' as const,
           text: chartDataItem.snapshot!.trade_marker!.type === 'square_up' ? 'S' : 'T',
+          size: 2, // Make markers more visible
         })) : [];
 
     let allMarkers = [...tradeMarkers];
