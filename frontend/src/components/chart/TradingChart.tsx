@@ -46,7 +46,7 @@ export function TradingChart() {
         scaleMargins: { top: 0.1, bottom: 0.1 },
       },
       rightPriceScale: {
-        visible: chartSettings.showUnderlying,
+        visible: chartSettings.selectedUnderlying !== null,
         borderVisible: false,
         scaleMargins: { top: 0.1, bottom: 0.1 },
       },
@@ -105,7 +105,7 @@ export function TradingChart() {
         minMove: 1,
       },
       priceScaleId: 'right',
-      visible: chartSettings.showUnderlying,
+      visible: chartSettings.selectedUnderlying !== null,
     });
 
     chartRef.current = chart;
@@ -165,7 +165,7 @@ export function TradingChart() {
       chart.remove();
       resizeObserverRef.current?.disconnect();
     };
-  }, [currentData, chartSettings.showUnderlying]);
+  }, [currentData, chartSettings.selectedUnderlying]);
 
   useEffect(() => {
     if (!currentData || !pnlSeriesRef.current || !underlyingSeriesRef.current) return;
@@ -200,7 +200,7 @@ export function TradingChart() {
     pnlSeriesRef.current.setData(pnlData);
   
     // Set underlying data - filter out null/undefined/invalid values
-    if (chartSettings.showUnderlying) {
+    if (chartSettings.selectedUnderlying !== null) {
       const underlyingData = uniqueChartData
         .filter((d) => 
           d.underlying !== null && 
@@ -221,22 +221,22 @@ export function TradingChart() {
   
     // Fit content
     chartRef.current?.timeScale().fitContent();
-  }, [currentData, chartSettings.showTradeMarkers, chartSettings.showUnderlying]);
+  }, [currentData, chartSettings.showTradeMarkers, chartSettings.selectedUnderlying]);
   
   // Update underlying visibility
   useEffect(() => {
     if (underlyingSeriesRef.current && chartRef.current) {
       underlyingSeriesRef.current.applyOptions({
-        visible: chartSettings.showUnderlying,
+        visible: chartSettings.selectedUnderlying !== null,
       });
       
       chartRef.current.applyOptions({
         rightPriceScale: {
-          visible: chartSettings.showUnderlying,
+          visible: chartSettings.selectedUnderlying !== null,
         },
       });
     }
-  }, [chartSettings.showUnderlying]);
+  }, [chartSettings.selectedUnderlying]);
 
   // Handle fullscreen
   useEffect(() => {

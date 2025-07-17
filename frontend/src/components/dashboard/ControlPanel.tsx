@@ -2,12 +2,11 @@ import { Button } from '@/components/ui/button';
 import { DatePicker } from './DatePicker';
 import { DaySummary } from './DaySummary';
 import { FilterControl } from './FilterControl';
+import { UnderlyingSelector } from './UnderlyingSelector';
 import { useStore } from '@/store/useStore';
 import { useTradingData } from '@/hooks/useTradingData';
 import {
   RefreshCw,
-  Eye,
-  EyeOff,
   Target,
   Circle,
 } from 'lucide-react';
@@ -28,15 +27,19 @@ export function ControlPanel() {
     <div className="glass-effect rounded-lg p-2 sm:p-3 border border-gray-200/50 max-w-full">
       {/* Mobile Layout - Stack vertically */}
       <div className="block sm:hidden space-y-2">
-        {/* Top row - Date and Filter */}
+        {/* Top row - Date and Filter 50/50 split */}
         <div className="flex items-center gap-2">
-          <DatePicker
-            selectedDate={selectedDate}
-            availableDates={tradingDays}
-            onDateChange={setSelectedDate}
-            disabled={loading}
-          />
-          <FilterControl />
+          <div className="flex-1">
+            <DatePicker
+              selectedDate={selectedDate}
+              availableDates={tradingDays}
+              onDateChange={setSelectedDate}
+              disabled={loading}
+            />
+          </div>
+          <div className="flex-1">
+            <FilterControl />
+          </div>
         </div>
         
         {/* Bottom row - Controls */}
@@ -52,22 +55,7 @@ export function ControlPanel() {
               <RefreshCw className={`h-3 w-3 ${loading ? 'animate-spin' : ''}`} />
             </Button>
             
-            <Button
-              variant={chartSettings.showUnderlying ? 'default' : 'outline'}
-              size="sm"
-              onClick={() =>
-                updateChartSettings({
-                  showUnderlying: !chartSettings.showUnderlying,
-                })
-              }
-              className="h-7 px-2"
-            >
-              {chartSettings.showUnderlying ? (
-                <Eye className="h-3 w-3" />
-              ) : (
-                <EyeOff className="h-3 w-3" />
-              )}
-            </Button>
+            <UnderlyingSelector />
             
             <Button
               variant={chartSettings.showTradeMarkers ? 'default' : 'outline'}
@@ -100,14 +88,16 @@ export function ControlPanel() {
       <div className="hidden sm:flex items-center justify-between gap-2">
         {/* Left side - Date picker, filters, and summary */}
         <div className="flex items-center gap-3 flex-1 min-w-0">
-          <DatePicker
-            selectedDate={selectedDate}
-            availableDates={tradingDays}
-            onDateChange={setSelectedDate}
-            disabled={loading}
-          />
-          
-          <FilterControl />
+          <div className="flex items-center gap-2">
+            <DatePicker
+              selectedDate={selectedDate}
+              availableDates={tradingDays}
+              onDateChange={setSelectedDate}
+              disabled={loading}
+            />
+            
+            <FilterControl />
+          </div>
 
           {currentData?.summary && (
             <div className="hidden md:block">
@@ -129,23 +119,7 @@ export function ControlPanel() {
             <span className="hidden sm:inline ml-1">Refresh</span>
           </Button>
           
-          <Button
-            variant={chartSettings.showUnderlying ? 'default' : 'outline'}
-            size="sm"
-            onClick={() =>
-              updateChartSettings({
-                showUnderlying: !chartSettings.showUnderlying,
-              })
-            }
-            className="h-8 px-2"
-          >
-            {chartSettings.showUnderlying ? (
-              <Eye className="h-3 w-3" />
-            ) : (
-              <EyeOff className="h-3 w-3" />
-            )}
-            <span className="hidden sm:inline ml-1">Spot</span>
-          </Button>
+          <UnderlyingSelector />
           
           <Button
             variant={chartSettings.showTradeMarkers ? 'default' : 'outline'}

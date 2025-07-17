@@ -49,7 +49,7 @@ export function DatePicker({
   }, [isOpen]);
 
   return (
-    <div className="flex items-center gap-2">
+    <div className="flex items-center gap-2 w-full">
       <Calendar className="h-4 w-4 text-gray-500 flex-shrink-0" />
       <Button
         ref={buttonRef}
@@ -57,7 +57,7 @@ export function DatePicker({
         size="sm"
         onClick={handleToggle}
         disabled={disabled}
-        className="h-8 px-3 w-32 sm:w-40 justify-between text-sm"
+        className="h-8 px-3 flex-1 min-w-0 sm:min-w-[160px] sm:flex-initial justify-between text-sm"
       >
         <span className="truncate">{formatDate(selectedDate)}</span>
         <ChevronDown className="h-3 w-3 ml-1 flex-shrink-0" />

@@ -80,7 +80,7 @@ export interface ViewMode {
 }
 
 export interface ChartSettings {
-  showUnderlying: boolean;
+  selectedUnderlying: string | null; // null means hide spot chart, string is the underlying symbol
   showTradeMarkers: boolean;
   showMarketContext: boolean;
   isFullscreen: boolean;

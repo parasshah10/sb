@@ -16,6 +16,7 @@ export function useTradingData() {
     setError,
     resetState,
     setAvailableFilters,
+    setAvailableUnderlyings,
   } = useStore();
 
   const loadTradingDays = useCallback(async () => {
@@ -44,6 +45,26 @@ export function useTradingData() {
 
       setAvailableFilters(filterData.filters);
       setCurrentData(dayData);
+
+      // Extract available underlyings from the data
+      if (dayData?.timeseries) {
+        const underlyings = new Set<string>();
+        dayData.timeseries.forEach(snapshot => {
+          snapshot.positions.forEach(position => {
+            if (position.instrument.underlying_symbol) {
+              underlyings.add(position.instrument.underlying_symbol);
+            }
+          });
+        });
+        const sortedUnderlyings = Array.from(underlyings).sort();
+        setAvailableUnderlyings(sortedUnderlyings);
+        
+        // Auto-select the first underlying if none is currently selected
+        const { chartSettings, updateChartSettings } = useStore.getState();
+        if (sortedUnderlyings.length > 0 && !chartSettings.selectedUnderlying) {
+          updateChartSettings({ selectedUnderlying: sortedUnderlyings[0] });
+        }
+      }
 
     } catch (err) {
       setError(err instanceof Error ? err.message : 'Failed to load trading data');

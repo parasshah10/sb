@@ -13,6 +13,7 @@ interface AppState {
   // Filters
   availableFilters: FilterOption[];
   selectedFilters: string[]; // array of filter keys
+  availableUnderlyings: string[]; // list of available underlying symbols
   
   // Chart settings
   chartSettings: ChartSettings;
@@ -31,6 +32,7 @@ interface AppState {
   setError: (error: string | null) => void;
   setAvailableFilters: (filters: FilterOption[]) => void;
   setSelectedFilters: (filters: string[]) => void;
+  setAvailableUnderlyings: (underlyings: string[]) => void;
   updateChartSettings: (settings: Partial<ChartSettings>) => void;
   setViewMode: (mode: ViewMode['type']) => void;
   setTooltipVisible: (visible: boolean) => void;
@@ -55,9 +57,10 @@ export const useStore = create<AppState>((set, get) => ({
   
   availableFilters: [],
   selectedFilters: [],
+  availableUnderlyings: [],
 
   chartSettings: {
-    showUnderlying: true,
+    selectedUnderlying: null, // Start with no underlying selected
     showTradeMarkers: true,
     showMarketContext: true,
     isFullscreen: false,
@@ -72,6 +75,8 @@ export const useStore = create<AppState>((set, get) => ({
     selectedDate: date, 
     selectedFilters: [], // Reset filters when date changes
     availableFilters: [],
+    availableUnderlyings: [],
+    chartSettings: { ...get().chartSettings, selectedUnderlying: null }, // Reset underlying selection
   }),
   setTradingDays: (days: string[]) => set({ tradingDays: days }),
   setCurrentData: (data: TradingDayData | null) => set({ currentData: data }),
@@ -81,6 +86,7 @@ export const useStore = create<AppState>((set, get) => ({
   
   setAvailableFilters: (filters: FilterOption[]) => set({ availableFilters: filters }),
   setSelectedFilters: (filters: string[]) => set({ selectedFilters: filters }),
+  setAvailableUnderlyings: (underlyings: string[]) => set({ availableUnderlyings: underlyings }),
 
   updateChartSettings: (settings) =>
     set((state) => ({
@@ -101,5 +107,6 @@ export const useStore = create<AppState>((set, get) => ({
       tooltipPosition: null,
       selectedFilters: [],
       availableFilters: [],
+      availableUnderlyings: [],
     }),
 }));

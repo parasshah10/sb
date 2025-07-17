@@ -49,20 +49,20 @@ export function FilterControl() {
     if (selectedFilters.length === 0) return "All Instruments";
     if (selectedFilters.length === 1) {
       const filter = availableFilters.find(f => f.key === selectedFilters[0]);
-      return filter ? `${filter.underlying_symbol}` : "1 Selected";
+      return filter ? `${filter.underlying_symbol} ${formatDate(filter.expiry)}` : "1 Selected";
     }
     return `${selectedFilters.length} Selected`;
   };
 
   return (
-    <div className="relative" ref={dropdownRef}>
+    <div className="relative w-full" ref={dropdownRef}>
       <Button
         ref={buttonRef}
         variant="outline"
         size="sm"
         onClick={handleToggle}
         disabled={loading}
-        className="h-8 px-2 w-32 justify-start"
+        className="h-8 px-2 w-full sm:min-w-[180px] sm:w-auto justify-start"
       >
         <Filter className="h-3 w-3 mr-2" />
         <span className="truncate">{getButtonText()}</span>
@@ -70,11 +70,11 @@ export function FilterControl() {
 
       {isOpen && buttonRect && createPortal(
         <div 
-          className="fixed w-64 bg-white border border-gray-200 rounded-md shadow-lg p-2" 
+          className="fixed w-56 bg-white border border-gray-200 rounded-md shadow-lg p-2" 
           style={{ 
             zIndex: 999999,
             left: buttonRect.left,
-            top: buttonRect.top - 150, // Position just above the button
+            top: buttonRect.top - 115, // Position above the button, fine-tuned spacing
           }}
           ref={dropdownRef}
         >
